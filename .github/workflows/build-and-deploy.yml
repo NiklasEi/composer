@@ -50,7 +50,7 @@ jobs:
           cat > satis.json <<'EOF'
           {
               "name": "oicana/packages",
-              "homepage": "https://oicana.github.io/composer",
+              "homepage": "https://composer.oicana.com",
               "repositories": [
                   {
                       "type": "vcs",
