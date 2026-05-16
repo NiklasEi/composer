@@ -67,6 +67,41 @@ jobs:
             cd ${{ github.workspace }}/oicana-source
           done
 
+      - name: Add checksums for installer tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: ${{ github.workspace }}/repo-installer
+        run: |
+          # For each installer tag, fetch the per-release checksums.json that
+          # the binary publish pipeline uploaded and add it to the tagged
+          # commit. The source repo ships a placeholder checksums.json with an
+          # empty binaries map; this step overwrites that placeholder with the
+          # real per-release hashes before Satis archives the tag. Tags whose
+          # release has no checksums.json (e.g. pre-feature releases) are left
+          # untouched — their subtree state on disk is what Satis archives.
+          git config user.email satis-bot@oicana.com
+          git config user.name satis-bot
+          for version in $(git tag -l); do
+            release_tag="oicana_php-v${version}"
+            git checkout "$version"
+
+            tmp=$(mktemp -d)
+            if gh release download "$release_tag" \
+                 --repo oicana/oicana \
+                 --pattern 'checksums.json' \
+                 --dir "$tmp" 2>/dev/null; then
+              cp "$tmp/checksums.json" checksums.json
+              git add checksums.json
+              if ! git diff --quiet --cached; then
+                git commit --amend --no-edit
+                git tag -f "$version"
+              fi
+            else
+              echo "::notice::No checksums.json on release for ${version}; leaving subtree as-is"
+            fi
+            rm -rf "$tmp"
+          done
+
       - name: Generate satis.json
         run: |
           cat > satis.json <<EOF
